@@ -1,0 +1,31 @@
+openapi: 3.0.3
+info:
+  title: AI Page Reporter API
+  version: "1.0.0"
+servers:
+  - url: https://your-server.com/api
+paths:
+  /report:
+    post:
+      summary: Report a page as AI-generated.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                url: { type: string, format: uri }
+                aiFlag: { type: boolean }
+                timestamp: { type: integer }
+              required: [url, timestamp]
+      responses:
+        '200':
+          description: Report submitted successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
