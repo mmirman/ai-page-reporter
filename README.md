@@ -92,3 +92,6 @@ For any issues or suggestions:
 
 ## 🌟 **Support the Project**
 If you like this project, **give it a ⭐ on GitHub**! 😊
+
+
+[![Star History Chart](https://api.star-history.com/svg?repos=mmirman/ai-page-reporter&type=Date)](https://star-history.com/#mmirman/ai-page-reporter)
