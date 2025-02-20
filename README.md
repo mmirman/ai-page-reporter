@@ -1,6 +1,6 @@
 # AI Page Reporter - Chrome Extension 🚀
 
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-GPL-blue.svg)](LICENSE)
 [![Chrome Extension](https://img.shields.io/badge/Chrome-Extension-green.svg)](https://chrome.google.com/TBD/)  
 
 AI Page Reporter is a **Chrome extension** that helps users **report AI-generated web pages**, remove flagged results from **Google Search**, and provide a **community discussion** around potentially AI-generated content.
@@ -83,7 +83,7 @@ We welcome contributions! To contribute:
 5. Open a **Pull Request**.
 
 ## 📝 **License**
-This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the **GPL License** - see the [LICENSE](LICENSE) file for details.
 
 ## 📧 **Contact & Support**
 For any issues or suggestions:
