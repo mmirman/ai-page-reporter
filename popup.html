@@ -1,11 +1,16 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <style> body { font-family: Arial; width: 300px; } button { margin: 5px; } </style>
+    <style>
+      body { font-family: Arial, sans-serif; width: 300px; margin: 10px; }
+      button { margin: 5px; padding: 5px 10px; width: 100%; }
+      #status { margin-top: 10px; }
+    </style>
   </head>
   <body>
     <h2>AI Page Reporter</h2>
     <button id="report-current-page">Report Current Page</button>
+    <button id="toggle-widget">Open Popup</button>
     <div id="status"></div>
     <script src="popup.js"></script>
   </body>
