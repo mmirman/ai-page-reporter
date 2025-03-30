@@ -75,13 +75,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   
   if (message.type === "updateAIStatus") {
     try {
-      console.log("Processing AI status update:", message.aiScore);
-      // Use the sender's tab ID when updating the icon
       const tabId = sender.tab ? sender.tab.id : null;
-      updateIcon(message.aiScore, tabId);
+      
+      if (tabId) {
+        // Get the URL for this tab
+        chrome.tabs.get(tabId, tab => {
+          // Always use the server status to update the badge
+          updateBadgeFromStatus(tab.url, tabId);
+        });
+      }
+      
       sendResponse({ success: true });
     } catch (error) {
-      console.error("Error updating icon:", error);
+      console.error("Error updating badge:", error);
       sendResponse({ success: false, error: error.message });
     }
     return true;
@@ -130,37 +136,9 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
   try {
     // Get the tab URL
     const tab = await chrome.tabs.get(tabId);
-    const url = tab.url;
     
-    // If we have a score for this tab, update the icon
-    if (tabScores.has(tabId)) {
-      const score = tabScores.get(tabId);
-      console.log(`Restoring score ${score} for tab ${tabId}`);
-      updateIcon(score, tabId);
-    } else if (url && !url.startsWith('chrome://')) {
-      // If we don't have a score but have a URL, fetch the status
-      console.log(`Fetching status for ${url}`);
-      try {
-        const response = await fetch(`${SERVER_URL}/status?url=${encodeURIComponent(url)}`);
-        const data = await response.json();
-        
-        if (data.success) {
-          // Calculate score based on report percentage
-          const score = data.reportCount / Math.max(data.totalVisits, 1);
-          console.log(`Got score ${score} for ${url}`);
-          updateIcon(score, tabId);
-        } else {
-          // Reset to default
-          resetTabBadge(tabId);
-        }
-      } catch (error) {
-        console.error("Error fetching status:", error);
-        resetTabBadge(tabId);
-      }
-    } else {
-      // Reset to default for tabs we haven't evaluated yet
-      resetTabBadge(tabId);
-    }
+    // Always use the server status to update the badge
+    updateBadgeFromStatus(tab.url, tabId);
   } catch (error) {
     console.error("Error handling tab activation:", error);
     resetTabBadge(tabId);
@@ -189,5 +167,47 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   if (tabScores.has(tabId)) {
     console.log(`Removing score for closed tab ${tabId}`);
     tabScores.delete(tabId);
+  }
+});
+
+// Add this helper function to background.js
+async function updateBadgeFromStatus(url, tabId) {
+  if (!url || url.startsWith('chrome://')) {
+    resetTabBadge(tabId);
+    return;
+  }
+  
+  try {
+    console.log(`Fetching status for ${url} to update badge`);
+    const response = await fetch(`${SERVER_URL}/status?url=${encodeURIComponent(url)}`);
+    const data = await response.json();
+    
+    if (!data.success) {
+      console.error("Error from status API:", data);
+      resetTabBadge(tabId);
+      return;
+    }
+    
+    // Calculate score directly from report percentage
+    const reportScore = data.totalVisits > 0 
+      ? data.reportCount / data.totalVisits 
+      : 0;
+    
+    console.log(`Badge update: URL ${url}, Reports: ${data.reportCount}, Visits: ${data.totalVisits}, Score: ${reportScore}`);
+    
+    // Update the badge with this score
+    updateIcon(reportScore, tabId);
+  } catch (error) {
+    console.error("Error fetching status for badge update:", error);
+    resetTabBadge(tabId);
+  }
+}
+
+// Listen for URL changes
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  // Only run when the URL has changed and loading is complete
+  if (changeInfo.status === 'complete' && tab.url) {
+    console.log(`Tab ${tabId} updated with new URL: ${tab.url}`);
+    updateBadgeFromStatus(tab.url, tabId);
   }
 });

@@ -218,40 +218,48 @@ app.post('/api/ai-evaluate', async (req, res) => {
   try {
     const { text, url } = req.body;
     
-    console.log(`Received AI evaluation request for ${url || 'unknown URL'}`);
-    console.log(`Text length: ${text ? text.length : 0} characters`);
-    
     if (!text) {
       return res.status(400).json({ success: false, message: 'Text is required' });
     }
     
-    // Simple AI detection algorithm (placeholder)
-    const aiScore = simpleAIDetection(text);
-    console.log(`Calculated AI score: ${aiScore}`);
-    
+    // Always check existing URL stats first
     if (url) {
-      // Find the URL record first
       const urlStat = await UrlStat.findOne({ url });
       
-      if (urlStat) {
-        // If it exists, update only the AI score, not the visit count
-        urlStat.aiScore = aiScore;
-        urlStat.lastUpdated = Date.now();
-        await urlStat.save();
-      } else {
-        // If it doesn't exist, create a new record
-        await UrlStat.create({
-          url,
-          aiScore,
-          totalVisits: 1, // Initial visit
-          lastUpdated: Date.now()
+      // If there are reports, use the report rate as the score
+      if (urlStat && urlStat.reportCount > 0 && urlStat.totalVisits > 0) {
+        const reportScore = urlStat.reportCount / urlStat.totalVisits;
+        console.log(`Using report rate for ${url}: ${reportScore}`);
+        
+        return res.json({
+          success: true,
+          score: reportScore,
+          source: 'reports'
         });
       }
     }
     
+    // Fall back to text-based evaluation if no reports
+    console.log(`Performing text evaluation for ${url || 'unknown URL'}`);
+    const aiScore = simpleAIDetection(text);
+    
+    // Store the AI evaluation if we have a URL and no reports yet
+    if (url) {
+      await UrlStat.findOneAndUpdate(
+        { url, reportCount: 0 }, // Only update if no reports
+        { 
+          aiScore,
+          lastUpdated: Date.now(),
+          $setOnInsert: { totalVisits: 1 }
+        },
+        { upsert: true, new: true }
+      );
+    }
+    
     res.json({
       success: true,
-      score: aiScore
+      score: aiScore,
+      source: 'aiEvaluation'
     });
   } catch (error) {
     console.error('AI evaluation error:', error);
