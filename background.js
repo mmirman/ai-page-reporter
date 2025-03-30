@@ -1,34 +1,43 @@
 const SERVER_URL = "http://localhost:8080/api";
 
+// Store AI scores for each tab
+const tabScores = new Map();
+
 // Update extension icon and badge
-function updateIcon(aiScore) {
+function updateIcon(aiScore, tabId) {
   // Ensure aiScore is a number
   aiScore = parseFloat(aiScore);
+  
+  // Store the score for this tab
+  if (tabId) {
+    tabScores.set(tabId, aiScore);
+    console.log(`Stored score ${aiScore} for tab ${tabId}`);
+  }
   
   // Determine color based on score
   let color = "#4CAF50"; // green
   let badgeText = "ok";  // Default text for low scores
   
-  console.log(`Evaluating score ${aiScore} for badge: ${aiScore > 0.3 ? 'Above 0.3' : 'Below 0.3'}`);
-  
-  if (aiScore > 0.3) {
+  // Use more appropriate thresholds:
+  // - "ai" for 30-70% report rate
+  // - "AI" for >70% report rate
+  if (aiScore >= 0.3 && aiScore < 0.7) {
     color = "#FFC107"; // yellow
     badgeText = "ai";
-    console.log("Setting yellow badge");
-  }
-  if (aiScore > 0.7) {
+  } else if (aiScore >= 0.7) {
     color = "#F44336"; // red
     badgeText = "AI";
-    console.log("Setting red badge");
   }
   
-  console.log(`Final badge settings - score: ${aiScore}, color: ${color}, badge: ${badgeText}`);
+  console.log(`Setting badge for score ${aiScore}: ${badgeText}, color: ${color}`);
 
   // Set badge text (short text that appears on the icon)
-  chrome.action.setBadgeText({ text: badgeText });
+  const badgeOptions = tabId ? { text: badgeText, tabId } : { text: badgeText };
+  chrome.action.setBadgeText(badgeOptions);
   
   // Set badge background color
-  chrome.action.setBadgeBackgroundColor({ color: color });
+  const colorOptions = tabId ? { color: color, tabId } : { color: color };
+  chrome.action.setBadgeBackgroundColor(colorOptions);
   
   // Change the icon based on score
   let iconPath;
@@ -56,7 +65,8 @@ function updateIcon(aiScore) {
   }
   
   // Update the icon
-  chrome.action.setIcon({ path: iconPath });
+  const iconOptions = tabId ? { path: iconPath, tabId } : { path: iconPath };
+  chrome.action.setIcon(iconOptions);
 }
 
 // Listen for AI evaluation results - improve error handling
@@ -66,7 +76,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "updateAIStatus") {
     try {
       console.log("Processing AI status update:", message.aiScore);
-      updateIcon(message.aiScore);
+      // Use the sender's tab ID when updating the icon
+      const tabId = sender.tab ? sender.tab.id : null;
+      updateIcon(message.aiScore, tabId);
       sendResponse({ success: true });
     } catch (error) {
       console.error("Error updating icon:", error);
@@ -101,35 +113,81 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
   }
 });
 
-// Test function to manually update the icon
-function testIconUpdate() {
-  console.log("Testing icon update with different scores");
-  
-  // Test with low score
-  setTimeout(() => {
-    console.log("Testing low score (0.1)");
-    updateIcon(0.1);
-  }, 2000);
-  
-  // Test with medium score
-  setTimeout(() => {
-    console.log("Testing medium score (0.5)");
-    updateIcon(0.5);
-  }, 4000);
-  
-  // Test with high score
-  setTimeout(() => {
-    console.log("Testing high score (0.8)");
-    updateIcon(0.8);
-  }, 6000);
-}
-
-// Run the test when extension is installed
+// Modify the onInstalled listener
 chrome.runtime.onInstalled.addListener(function() {
-  console.log("Extension installed, running icon test");
-  testIconUpdate();
+  console.log("Extension installed");
   
   if (Notification.permission !== 'granted') {
     Notification.requestPermission();
+  }
+});
+
+// Add a tab change listener to update the badge when switching tabs
+chrome.tabs.onActivated.addListener(async (activeInfo) => {
+  const tabId = activeInfo.tabId;
+  console.log(`Tab activated: ${tabId}`);
+  
+  try {
+    // Get the tab URL
+    const tab = await chrome.tabs.get(tabId);
+    const url = tab.url;
+    
+    // If we have a score for this tab, update the icon
+    if (tabScores.has(tabId)) {
+      const score = tabScores.get(tabId);
+      console.log(`Restoring score ${score} for tab ${tabId}`);
+      updateIcon(score, tabId);
+    } else if (url && !url.startsWith('chrome://')) {
+      // If we don't have a score but have a URL, fetch the status
+      console.log(`Fetching status for ${url}`);
+      try {
+        const response = await fetch(`${SERVER_URL}/status?url=${encodeURIComponent(url)}`);
+        const data = await response.json();
+        
+        if (data.success) {
+          // Calculate score based on report percentage
+          const score = data.reportCount / Math.max(data.totalVisits, 1);
+          console.log(`Got score ${score} for ${url}`);
+          updateIcon(score, tabId);
+        } else {
+          // Reset to default
+          resetTabBadge(tabId);
+        }
+      } catch (error) {
+        console.error("Error fetching status:", error);
+        resetTabBadge(tabId);
+      }
+    } else {
+      // Reset to default for tabs we haven't evaluated yet
+      resetTabBadge(tabId);
+    }
+  } catch (error) {
+    console.error("Error handling tab activation:", error);
+    resetTabBadge(tabId);
+  }
+});
+
+// Helper function to reset badge
+function resetTabBadge(tabId) {
+  console.log(`No score for tab ${tabId}, using default`);
+  // Don't show any badge until we have a score
+  chrome.action.setBadgeText({ text: "", tabId });
+  chrome.action.setBadgeBackgroundColor({ color: "#4CAF50", tabId });
+  chrome.action.setIcon({ 
+    path: {
+      16: "icons/icon-green-16.png",
+      32: "icons/icon-green-32.png",
+      48: "icons/icon-green-48.png",
+      128: "icons/icon-green-128.png"
+    },
+    tabId 
+  });
+}
+
+// Clean up tab scores when tabs are closed
+chrome.tabs.onRemoved.addListener((tabId) => {
+  if (tabScores.has(tabId)) {
+    console.log(`Removing score for closed tab ${tabId}`);
+    tabScores.delete(tabId);
   }
 });

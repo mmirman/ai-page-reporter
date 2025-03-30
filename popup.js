@@ -18,38 +18,50 @@ document.addEventListener('DOMContentLoaded', async function() {
   const tabs = await chrome.tabs.query({active: true, currentWindow: true});
   const currentUrl = tabs[0].url;
   
-  // Track this visit and check if it's the first time
-  const isFirstVisit = await trackUrlVisit(currentUrl);
-  
-  // If it's the first visit, show a notification and prompt for reporting
-  if (isFirstVisit) {
-    const notificationDiv = document.createElement('div');
-    notificationDiv.className = 'first-visit-notification';
-    notificationDiv.textContent = 'First time visiting this site! Would you like to report it?';
+  // Check if we've already tracked this URL in this session
+  chrome.storage.session.get(['trackedUrls'], async function(result) {
+    const trackedUrls = result.trackedUrls || {};
     
-    const reportButton = document.createElement('button');
-    reportButton.textContent = 'Report';
-    reportButton.addEventListener('click', function() {
-      // Show report form
-      document.getElementById('report-form').style.display = 'block';
-      notificationDiv.style.display = 'none';
-    });
+    // Only track if we haven't tracked this URL in this session
+    if (!trackedUrls[currentUrl]) {
+      // Track this visit and check if it's the first time
+      const isFirstVisit = await trackUrlVisit(currentUrl);
+      
+      // Mark this URL as tracked in this session
+      trackedUrls[currentUrl] = true;
+      chrome.storage.session.set({ trackedUrls: trackedUrls });
+      
+      // If it's the first visit, show a notification and prompt for reporting
+      if (isFirstVisit) {
+        const notificationDiv = document.createElement('div');
+        notificationDiv.className = 'first-visit-notification';
+        notificationDiv.textContent = 'First time visiting this site! Would you like to report it?';
+        
+        const reportButton = document.createElement('button');
+        reportButton.textContent = 'Report';
+        reportButton.addEventListener('click', function() {
+          // Show report form
+          document.getElementById('report-form').style.display = 'block';
+          notificationDiv.style.display = 'none';
+        });
+        
+        const dismissButton = document.createElement('button');
+        dismissButton.textContent = 'Dismiss';
+        dismissButton.addEventListener('click', function() {
+          notificationDiv.style.display = 'none';
+        });
+        
+        notificationDiv.appendChild(reportButton);
+        notificationDiv.appendChild(dismissButton);
+        
+        // Add to the popup
+        document.body.insertBefore(notificationDiv, document.body.firstChild);
+      }
+    }
     
-    const dismissButton = document.createElement('button');
-    dismissButton.textContent = 'Dismiss';
-    dismissButton.addEventListener('click', function() {
-      notificationDiv.style.display = 'none';
-    });
-    
-    notificationDiv.appendChild(reportButton);
-    notificationDiv.appendChild(dismissButton);
-    
-    // Add to the popup
-    document.body.insertBefore(notificationDiv, document.body.firstChild);
-  }
-  
-  // Update the status display
-  updateStatusDisplay(currentUrl);
+    // Always update the status display
+    updateStatusDisplay(currentUrl);
+  });
 });
 
 // Function to update the status display

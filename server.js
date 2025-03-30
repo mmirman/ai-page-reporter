@@ -88,7 +88,7 @@ function hashIP(ip) {
 // Submit a report
 app.post('/api/report', async (req, res) => {
   try {
-    const { url, aiFlag, timestamp, sessionId } = req.body;
+    const { url, aiFlag, timestamp, sessionId, text } = req.body;
     
     if (!url) {
       return res.status(400).json({ success: false, message: 'URL is required' });
@@ -138,13 +138,22 @@ app.post('/api/report', async (req, res) => {
         postId,
         reportCount: 1,
         uniqueReporters: 1,
-        firstReported: Date.now()
+        firstReported: Date.now(),
+        totalVisits: 1 // Assume at least one visit (the reporter)
       });
     } else {
       urlStat.reportCount += 1;
       urlStat.uniqueReporters += 1;
       urlStat.lastUpdated = Date.now();
     }
+    
+    // Calculate AI score based on report percentage
+    const reportPercentage = urlStat.totalVisits > 0 
+      ? urlStat.reportCount / urlStat.totalVisits 
+      : 0;
+    
+    // Set AI score based on report percentage (0-1 scale)
+    urlStat.aiScore = reportPercentage;
     
     await urlStat.save();
     
@@ -153,7 +162,9 @@ app.post('/api/report', async (req, res) => {
       message: 'Report submitted successfully',
       stats: {
         reportCount: urlStat.reportCount,
-        shouldHide: urlStat.shouldHide
+        totalVisits: urlStat.totalVisits,
+        reportPercentage: reportPercentage,
+        aiScore: urlStat.aiScore
       }
     });
   } catch (error) {
@@ -219,11 +230,23 @@ app.post('/api/ai-evaluate', async (req, res) => {
     console.log(`Calculated AI score: ${aiScore}`);
     
     if (url) {
-      await UrlStat.findOneAndUpdate(
-        { url },
-        { aiScore, lastUpdated: Date.now() },
-        { upsert: true }
-      );
+      // Find the URL record first
+      const urlStat = await UrlStat.findOne({ url });
+      
+      if (urlStat) {
+        // If it exists, update only the AI score, not the visit count
+        urlStat.aiScore = aiScore;
+        urlStat.lastUpdated = Date.now();
+        await urlStat.save();
+      } else {
+        // If it doesn't exist, create a new record
+        await UrlStat.create({
+          url,
+          aiScore,
+          totalVisits: 1, // Initial visit
+          lastUpdated: Date.now()
+        });
+      }
     }
     
     res.json({

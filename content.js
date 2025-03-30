@@ -86,6 +86,15 @@
         widgetBody.classList.add('reported');
         reportStatus.textContent = "Reported successfully!";
         reportButton.disabled = true;
+        
+        // Update the badge to reflect the report
+        if (data.stats && data.stats.aiScore) {
+          console.log("Updating badge after report with score:", data.stats.aiScore);
+          chrome.runtime.sendMessage({ 
+            type: "updateAIStatus", 
+            aiScore: data.stats.aiScore
+          });
+        }
       } else {
         reportStatus.textContent = "Error: " + (data.message || "Failed to report");
       }
@@ -107,12 +116,24 @@
   function evaluatePageContent() {
     console.log("Starting AI evaluation of page content");
     
+    // Don't re-evaluate if we've already done it for this page
+    if (shadow.getElementById('ai-status-indicator').textContent) {
+      console.log("AI evaluation already performed, skipping");
+      return;
+    }
+    
     const widget = document.getElementById(widgetContainerId);
     if (!widget) {
       console.error("Widget element not found");
       return;
     }
     
+    // Show loading state
+    const indicator = shadow.getElementById('ai-status-indicator');
+    indicator.textContent = "Evaluating...";
+    indicator.style.color = "#999";
+    
+    // Get text content
     const originalDisplay = widget.style.display;
     widget.style.display = 'none';
     const contentText = document.body.innerText.slice(0, 10000);
@@ -120,50 +141,57 @@
 
     console.log(`Sending ${contentText.length} characters for AI evaluation`);
 
-    fetch(`${SERVER_URL}/ai-evaluate`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: contentText })
-    })
-    .then(response => {
-      console.log("AI evaluation response received", response.status);
-      return response.json();
-    })
-    .then(data => {
-      console.log("AI evaluation result:", data);
-      const score = parseFloat(data.score);
-      
-      const indicator = shadow.getElementById('ai-status-indicator');
-      indicator.textContent = `AI Score: ${(score * 100).toFixed(1)}%`;
-      
-      if (score > 0.9) {
-        indicator.classList.add("suspicious");
-        indicator.style.color = "#F44336";
-      } else if (score > 0.3) {
-        indicator.style.color = "#FFC107";
-      } else {
-        indicator.classList.remove("suspicious");
-        indicator.style.color = "#4CAF50";
-      }
-      
-      console.log(`Sending AI score update: ${score}`);
-      chrome.runtime.sendMessage({ 
-        type: "updateAIStatus", 
-        aiScore: score 
-      }, response => {
-        if (chrome.runtime.lastError) {
-          console.error("Error sending AI status:", chrome.runtime.lastError);
+    // Add a debounce to prevent multiple rapid evaluations
+    clearTimeout(window.aiEvaluationTimer);
+    window.aiEvaluationTimer = setTimeout(() => {
+      fetch(`${SERVER_URL}/ai-evaluate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          text: contentText,
+          url: window.location.href
+        })
+      })
+      .then(response => {
+        console.log("AI evaluation response received", response.status);
+        return response.json();
+      })
+      .then(data => {
+        console.log("AI evaluation result:", data);
+        const score = parseFloat(data.score);
+        
+        const indicator = shadow.getElementById('ai-status-indicator');
+        indicator.textContent = `AI Score: ${(score * 100).toFixed(1)}%`;
+        
+        if (score > 0.9) {
+          indicator.classList.add("suspicious");
+          indicator.style.color = "#F44336";
+        } else if (score > 0.3) {
+          indicator.style.color = "#FFC107";
         } else {
-          console.log("AI status update sent successfully", response);
+          indicator.classList.remove("suspicious");
+          indicator.style.color = "#4CAF50";
         }
+        
+        console.log(`Sending AI score update: ${score}`);
+        chrome.runtime.sendMessage({ 
+          type: "updateAIStatus", 
+          aiScore: score 
+        }, response => {
+          if (chrome.runtime.lastError) {
+            console.error("Error sending AI status:", chrome.runtime.lastError);
+          } else {
+            console.log("AI status update sent successfully", response);
+          }
+        });
+      })
+      .catch(err => {
+        console.error("AI evaluation error:", err);
+        const indicator = shadow.getElementById('ai-status-indicator');
+        indicator.textContent = "AI evaluation failed";
+        indicator.style.color = "#999";
       });
-    })
-    .catch(err => {
-      console.error("AI evaluation error:", err);
-      const indicator = shadow.getElementById('ai-status-indicator');
-      indicator.textContent = "AI evaluation failed";
-      indicator.style.color = "#999";
-    });
+    }, 500);
   }
 
   console.log("AI Reporter: Content script loaded, will evaluate page content");
@@ -176,20 +204,4 @@
 
   // Add this at the beginning of the content script
   console.log("AI Reporter content script injected on:", window.location.href);
-
-  // Add a simple test to check if the extension is working
-  setTimeout(() => {
-    console.log("AI Reporter: Sending test message to background script");
-    chrome.runtime.sendMessage({ 
-      type: "updateAIStatus", 
-      aiScore: 0.5,
-      test: true
-    }, response => {
-      if (chrome.runtime.lastError) {
-        console.error("Test message error:", chrome.runtime.lastError);
-      } else {
-        console.log("Test message response:", response);
-      }
-    });
-  }, 3000);
 })();
