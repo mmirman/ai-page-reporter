@@ -7,18 +7,18 @@ function updateIcon(aiScore) {
   
   // Determine color based on score
   let color = "#4CAF50"; // green
-  let badgeText = "OK";  // Default text for low scores
+  let badgeText = "ok";  // Default text for low scores
   
   console.log(`Evaluating score ${aiScore} for badge: ${aiScore > 0.3 ? 'Above 0.3' : 'Below 0.3'}`);
   
   if (aiScore > 0.3) {
     color = "#FFC107"; // yellow
-    badgeText = "!";
+    badgeText = "ai";
     console.log("Setting yellow badge");
   }
   if (aiScore > 0.7) {
     color = "#F44336"; // red
-    badgeText = "!!";
+    badgeText = "AI";
     console.log("Setting red badge");
   }
   
@@ -59,11 +59,19 @@ function updateIcon(aiScore) {
   chrome.action.setIcon({ path: iconPath });
 }
 
-// Listen for AI evaluation results
-chrome.runtime.onMessage.addListener((message, sender) => {
+// Listen for AI evaluation results - improve error handling
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  console.log("Background script received message:", message);
+  
   if (message.type === "updateAIStatus") {
-    console.log("Received AI status update:", message.aiScore);
-    updateIcon(message.aiScore);
+    try {
+      console.log("Processing AI status update:", message.aiScore);
+      updateIcon(message.aiScore);
+      sendResponse({ success: true });
+    } catch (error) {
+      console.error("Error updating icon:", error);
+      sendResponse({ success: false, error: error.message });
+    }
     return true;
   }
 });
@@ -93,8 +101,34 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
   }
 });
 
-// Request notification permission when extension is installed
+// Test function to manually update the icon
+function testIconUpdate() {
+  console.log("Testing icon update with different scores");
+  
+  // Test with low score
+  setTimeout(() => {
+    console.log("Testing low score (0.1)");
+    updateIcon(0.1);
+  }, 2000);
+  
+  // Test with medium score
+  setTimeout(() => {
+    console.log("Testing medium score (0.5)");
+    updateIcon(0.5);
+  }, 4000);
+  
+  // Test with high score
+  setTimeout(() => {
+    console.log("Testing high score (0.8)");
+    updateIcon(0.8);
+  }, 6000);
+}
+
+// Run the test when extension is installed
 chrome.runtime.onInstalled.addListener(function() {
+  console.log("Extension installed, running icon test");
+  testIconUpdate();
+  
   if (Notification.permission !== 'granted') {
     Notification.requestPermission();
   }

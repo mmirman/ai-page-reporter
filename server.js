@@ -207,11 +207,16 @@ app.post('/api/ai-evaluate', async (req, res) => {
   try {
     const { text, url } = req.body;
     
+    console.log(`Received AI evaluation request for ${url || 'unknown URL'}`);
+    console.log(`Text length: ${text ? text.length : 0} characters`);
+    
     if (!text) {
       return res.status(400).json({ success: false, message: 'Text is required' });
     }
     
+    // Simple AI detection algorithm (placeholder)
     const aiScore = simpleAIDetection(text);
+    console.log(`Calculated AI score: ${aiScore}`);
     
     if (url) {
       await UrlStat.findOneAndUpdate(

@@ -173,4 +173,23 @@
     console.log("AI Reporter: Page loaded, evaluating content");
     evaluatePageContent();
   });
+
+  // Add this at the beginning of the content script
+  console.log("AI Reporter content script injected on:", window.location.href);
+
+  // Add a simple test to check if the extension is working
+  setTimeout(() => {
+    console.log("AI Reporter: Sending test message to background script");
+    chrome.runtime.sendMessage({ 
+      type: "updateAIStatus", 
+      aiScore: 0.5,
+      test: true
+    }, response => {
+      if (chrome.runtime.lastError) {
+        console.error("Test message error:", chrome.runtime.lastError);
+      } else {
+        console.log("Test message response:", response);
+      }
+    });
+  }, 3000);
 })();
