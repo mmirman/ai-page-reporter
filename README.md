@@ -9,9 +9,10 @@ AI Page Reporter is a **Chrome extension** that helps users **report AI-generate
 ## 📌 **Features**
 ✅ Floating **AI Reporter widget** on every webpage  
 ✅ **One-click reporting** to flag pages as AI-generated  
-✅ **Community comments** to discuss authenticity  
+✅ **Community-driven** reporting system  
+✅ **Social media integration** for reporting AI content on platforms like Twitter, LinkedIn, Facebook, and Reddit  
 ✅ **AI-based detection** and highlighting of suspicious text  
-✅ **Google Search result filtering** to hide flagged AI content  
+✅ **Visit tracking** to measure report-to-visit ratios  
 
 
 ## 📂 **Installation Guide**
@@ -30,34 +31,46 @@ AI Page Reporter is a **Chrome extension** that helps users **report AI-generate
 5. **The extension is now installed! 🎉**
 
 ## 🖥 **Running the Backend API**
-AI Page Reporter uses a backend API to store reports, manage comments, and detect AI-generated content.
+AI Page Reporter uses a Node.js/Express backend API to store reports, track visits, and detect AI-generated content.
 
-### **Option 1: Use an Existing Server**
-Modify `SERVER_URL` in `background.js` and `content.js` to point to an **existing API**.
-
-### **Option 2: Run a Local API**
+### **Option 1: Use the In-Memory Database (Development)**
 1. **Install dependencies**:
    ```sh
-   pip install flask
+   npm install express cors mongoose morgan helmet mongodb-memory-server dotenv
    ```
 2. **Run the server**:
    ```sh
-   python server.py
+   node server.js
    ```
-3. Modify `SERVER_URL` to `http://localhost:5000/api` in `background.js` and `content.js`.
+   This will start the server with an in-memory MongoDB instance for development.
+
+### **Option 2: Use a Real MongoDB Database (Production)**
+1. **Create a `.env` file** with your MongoDB connection string:
+   ```
+   MONGODB_URI=mongodb://your-mongodb-connection-string
+   PORT=8080
+   REPORT_THRESHOLD=0.5
+   IP_SALT=some-random-string-for-hashing
+   ```
+2. **Run the server**:
+   ```sh
+   node server.js
+   ```
 
 ## 🎯 **Usage**
 ### **🔹 AI Reporter Widget**
 - Appears on all web pages (bottom-right corner).
-- Click **“Report AI?”** to flag the current page.
-- Click **“Toggle Comments”** to see community discussions.
+- Click **"Report as AI"** to flag the current page.
+- The widget will show the AI evaluation status of the current page.
 
 ### **🔹 Popup Menu**
 - Click the **extension icon** in Chrome.
-- Click **"Report Current Page"** to submit a report.
+- See statistics about the current page including visit count and report percentage.
+- First-time visits will prompt you with a reporting option.
 
-### **🔹 Google Search Filtering**
-- **Flagged AI-generated pages** will be hidden from Google search results.
+### **🔹 Social Media Integration**
+- When browsing supported social media platforms (Twitter, LinkedIn, Facebook, Reddit), the extension adds **"Report AI"** buttons to posts.
+- Click these buttons to report AI-generated content directly from your feed.
 
 
 ## 🛠 **Project Structure**
@@ -68,11 +81,22 @@ ai-page-reporter/
 ├── content.js           # Content script (injects AI Reporter widget)
 ├── popup.html           # Popup UI
 ├── popup.js             # Popup functionality
-├── openapi.yaml         # OpenAPI Specification for the backend
+├── arrive.js            # Library for detecting new DOM elements
+├── social-integration.js # Social media platform integration
+├── server.js            # Express server for backend API
 ├── README.md            # This ReadMe file
 └── LICENSE              # License information
 ```
 
+## 🔄 **API Endpoints**
+
+The server provides the following API endpoints:
+
+- **POST /api/report** - Submit a report for a URL
+- **GET /api/status** - Get the status of a URL (report count, visit count, etc.)
+- **POST /api/ai-evaluate** - Evaluate text for AI-generated content
+- **POST /api/trackVisit** - Track a visit to a URL
+- **GET /api/config** - Get server configuration (report threshold)
 
 ## 👥 **Contributing**
 We welcome contributions! To contribute:
