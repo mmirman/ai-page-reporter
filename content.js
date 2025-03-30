@@ -105,26 +105,72 @@
 
   // AI Evaluation
   function evaluatePageContent() {
+    console.log("Starting AI evaluation of page content");
+    
     const widget = document.getElementById(widgetContainerId);
+    if (!widget) {
+      console.error("Widget element not found");
+      return;
+    }
+    
     const originalDisplay = widget.style.display;
     widget.style.display = 'none';
     const contentText = document.body.innerText.slice(0, 10000);
     widget.style.display = originalDisplay;
+
+    console.log(`Sending ${contentText.length} characters for AI evaluation`);
 
     fetch(`${SERVER_URL}/ai-evaluate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text: contentText })
     })
-    .then(response => response.json())
-    .then(data => {
-      const indicator = shadow.getElementById('ai-status-indicator');
-      if (data.score > 0.9) indicator.classList.add("suspicious");
-      else indicator.classList.remove("suspicious");
-      chrome.runtime.sendMessage({ type: "updateAIStatus", aiScore: data.score });
+    .then(response => {
+      console.log("AI evaluation response received", response.status);
+      return response.json();
     })
-    .catch(err => console.error("AI evaluation error:", err));
+    .then(data => {
+      console.log("AI evaluation result:", data);
+      const score = parseFloat(data.score);
+      
+      const indicator = shadow.getElementById('ai-status-indicator');
+      indicator.textContent = `AI Score: ${(score * 100).toFixed(1)}%`;
+      
+      if (score > 0.9) {
+        indicator.classList.add("suspicious");
+        indicator.style.color = "#F44336";
+      } else if (score > 0.3) {
+        indicator.style.color = "#FFC107";
+      } else {
+        indicator.classList.remove("suspicious");
+        indicator.style.color = "#4CAF50";
+      }
+      
+      console.log(`Sending AI score update: ${score}`);
+      chrome.runtime.sendMessage({ 
+        type: "updateAIStatus", 
+        aiScore: score 
+      }, response => {
+        if (chrome.runtime.lastError) {
+          console.error("Error sending AI status:", chrome.runtime.lastError);
+        } else {
+          console.log("AI status update sent successfully", response);
+        }
+      });
+    })
+    .catch(err => {
+      console.error("AI evaluation error:", err);
+      const indicator = shadow.getElementById('ai-status-indicator');
+      indicator.textContent = "AI evaluation failed";
+      indicator.style.color = "#999";
+    });
   }
 
-  window.addEventListener('load', evaluatePageContent);
+  console.log("AI Reporter: Content script loaded, will evaluate page content");
+
+  // Make sure this is called when the page loads
+  window.addEventListener('load', function() {
+    console.log("AI Reporter: Page loaded, evaluating content");
+    evaluatePageContent();
+  });
 })();
