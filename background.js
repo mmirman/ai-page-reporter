@@ -1,4 +1,4 @@
-const SERVER_URL = "https://your-server.com/api";
+const SERVER_URL = "https://localhost:8080/api";
 
 // Update extension icon and badge
 function updateIcon(aiScore) {
@@ -6,14 +6,9 @@ function updateIcon(aiScore) {
   if (aiScore > 0.3) color = "yellow";
   if (aiScore > 0.7) color = "red";
   
-  console.log(`Updating icon to ${color} with score ${aiScore}`); // Debug log
-  chrome.action.setIcon({ path: {
-    "16": `icons/icon-${color}-16.png`,
-    "32": `icons/icon-${color}-32.png`,
-    "48": `icons/icon-${color}-48.png`,
-    "128": `icons/icon-${color}-128.png`
-  }});
-  chrome.action.setBadgeText({ text: Math.round(aiScore * 100).toString() });
+  console.log(`Updating icon to ${color} with score ${aiScore}`);
+
+  chrome.action.setBadgeText({ text: `icons/icon-${color}.png` });
   chrome.action.setBadgeBackgroundColor({ color });
 }
 
@@ -42,14 +37,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
-// Toggle widget on icon click
-chrome.action.onClicked.addListener((tab) => {
-  console.log("Extension icon clicked"); // Debug log
-  chrome.tabs.sendMessage(tab.id, { type: "toggleWidget" }, (response) => {
-    if (chrome.runtime.lastError) {
-      console.error("Error toggling widget:", chrome.runtime.lastError.message);
-    } else {
-      console.log("Widget toggle response:", response);
-    }
-  });
+// Create a new background.js file
+chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
+  if (request.action === 'openPopup') {
+    chrome.action.openPopup();
+  }
+});
+
+// Request notification permission when extension is installed
+chrome.runtime.onInstalled.addListener(function() {
+  if (Notification.permission !== 'granted') {
+    Notification.requestPermission();
+  }
 });

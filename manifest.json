@@ -1,12 +1,13 @@
 {
   "manifest_version": 3,
   "name": "AI Page Reporter",
-  "version": "1.3",
+  "version": "1.4",
   "description": "Report AI-generated pages, view community ratings, and AI estimates.",
   "permissions": [
     "storage",
-    "activeTab",
-    "scripting"
+    "tabs",
+    "notifications",
+    "activeTab"
   ],
   "host_permissions": [
     "https://*/*",
@@ -19,6 +20,11 @@
     {
       "matches": ["<all_urls>"],
       "js": ["content.js"],
+      "run_at": "document_end"
+    },
+    {
+      "matches": ["*://*.linkedin.com/*", "*://*.twitter.com/*", "*://*.x.com/*", "*://*.facebook.com/*", "*://*.reddit.com/*"],
+      "js": ["arrive.js", "social-integration.js"],
       "run_at": "document_end"
     }
   ],

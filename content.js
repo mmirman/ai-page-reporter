@@ -1,5 +1,5 @@
 (() => {
-  const SERVER_URL = "https://your-server.com/api";
+  const SERVER_URL = "http://localhost:8080/api";
   const widgetContainerId = "ai-reporter-container";
 
   if (!document.body || document.getElementById(widgetContainerId)) return;
@@ -16,15 +16,15 @@
   // Attach Shadow DOM
   const shadow = widgetContainer.attachShadow({ mode: 'open' });
 
-  // Widget HTML with styling
+  // Widget HTML
   const widgetHTML = document.createElement('div');
   widgetHTML.innerHTML = `
     <style>
       #widget-header { background: #f0f0f0; padding: 5px; display: flex; justify-content: space-between; }
       #widget-close { font-size: 16px; cursor: pointer; border: none; background: none; }
       #widget-body { padding: 10px; }
-      #ai-comments-section { margin-top: 10px; }
-      #comment-input { width: 100%; margin-top: 5px; }
+      #report-ai-btn { margin: 5px 0; }
+      .reported { background-color: red; color: white; padding: 5px; }
     </style>
     <div id="ai-reporter-widget">
       <div id="widget-header">
@@ -33,15 +33,9 @@
       </div>
       <div id="widget-body">
         <div id="notification"></div>
-        <button id="report-ai-btn">Report AI?</button>
-        <button id="toggle-comments-btn">Toggle Comments</button>
+        <button id="report-ai-btn">Report as AI</button>
+        <span id="report-status"></span>
         <div id="ai-status-indicator" title="AI evaluation status"></div>
-        <div id="ai-comments-section" style="display:none;">
-          <h3>Comments</h3>
-          <div id="comments-container"></div>
-          <textarea id="comment-input" placeholder="Add your comment"></textarea>
-          <button id="submit-comment-btn">Submit Comment</button>
-        </div>
       </div>
     </div>
   `;
@@ -49,35 +43,59 @@
 
   // Toggle widget visibility
   function toggleWidget() {
-    console.log("Toggling widget"); // Debug log
-    const isHidden = widgetContainer.style.display === 'none';
+    console.log("Toggling widget");
+    const isHidden = widgetContainer.style.display === 'none' || widgetContainer.style.display === '';
     widgetContainer.style.display = isHidden ? 'block' : 'none';
-    sessionStorage.setItem("ai-widget-hidden", !isHidden);
+    chrome.storage.local.set({ "ai-widget-hidden": !isHidden });
   }
 
   // Close button listener
   const closeButton = shadow.getElementById('widget-close');
-  if (closeButton) {
-    closeButton.addEventListener('click', () => {
-      console.log("Close button clicked"); // Debug log
-      toggleWidget();
-    });
-  } else {
-    console.error("Close button not found in Shadow DOM");
-  }
-
-  // Restore widget state
-  widgetContainer.style.display = sessionStorage.getItem("ai-widget-hidden") === "true" ? 'none' : 'block';
-
-  // Toggle comments
-  const toggleCommentsBtn = shadow.getElementById('toggle-comments-btn');
-  const commentsSection = shadow.getElementById('ai-comments-section');
-  toggleCommentsBtn.addEventListener('click', () => {
-    console.log("Toggle comments clicked"); // Debug log
-    commentsSection.style.display = commentsSection.style.display === 'none' ? 'block' : 'none';
+  closeButton.addEventListener('click', () => {
+    console.log("Close button clicked");
+    toggleWidget();
   });
 
-  // Listen for toggle from background
+  // Restore widget state
+  chrome.storage.local.get(["ai-widget-hidden"], (result) => {
+    widgetContainer.style.display = result["ai-widget-hidden"] ? 'none' : 'block';
+  });
+
+  // Report button logic
+  const reportButton = shadow.getElementById('report-ai-btn');
+  const reportStatus = shadow.getElementById('report-status');
+  reportButton.addEventListener('click', async () => {
+    console.log("Report as AI clicked");
+    try {
+      const response = await fetch(`${SERVER_URL}/report`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          url: window.location.href,
+          aiFlag: true,
+          timestamp: Date.now(),
+          sessionId: crypto.randomUUID() // Add a session ID
+        })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        const widgetBody = shadow.getElementById('widget-body');
+        widgetBody.classList.add('reported');
+        reportStatus.textContent = "Reported successfully!";
+        reportButton.disabled = true;
+      } else {
+        reportStatus.textContent = "Error: " + (data.message || "Failed to report");
+      }
+    } catch (error) {
+      console.error("Report error:", error);
+      reportStatus.textContent = "Error: Failed to connect to server";
+    }
+  });
+
+  // Handle messages from popup
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === "toggleWidget") {
       toggleWidget();
